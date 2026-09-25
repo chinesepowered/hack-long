@@ -39,6 +39,14 @@ export const config = {
     draft: bool("FLUX_DRAFT", true),
     duration: num("FLUX_DURATION", 12),
     resolution: env("FLUX_RESOLUTION", "hd"),
+    // Credits are shared with other projects: auto-detected stories air as text unless this is on,
+    // and all FLUX spend (videos and final cuts) is capped per rolling 24 hours.
+    autoVideo: bool("FLUX_AUTO_VIDEO", false),
+    dailyBudgetCredits: num("FLUX_DAILY_BUDGET_CREDITS", 800),
+  },
+  anchor: {
+    id: env("ANCHOR_ID", "scout"),
+    name: env("ANCHOR_NAME", "Scout"),
   },
   llm: {
     // Any OpenAI-compatible endpoint: OpenAI, OpenRouter, Together, a local server...

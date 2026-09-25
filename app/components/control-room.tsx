@@ -81,7 +81,9 @@ export function ControlRoom() {
 
   const bulletins = state?.bulletins ?? [];
   const latest = bulletins[0] ?? null;
-  const selected = (pinned && bulletins.find((b) => b.storyId === pinned)) || latest;
+  // Default to the newest bulletin that has video; text-only stories stay in the rundown.
+  const onAir = bulletins.find((b) => b.videoUrl) ?? latest;
+  const selected = (pinned && bulletins.find((b) => b.storyId === pinned)) || onAir;
   const production = useMemo(() => (state ? currentProduction(state.storyFeed?.length ? state.storyFeed : state.feed) : null), [state]);
   const rows = (table: string) => state?.tables.find((t) => t.name === table)?.rows ?? 0;
   const rawEvents = rows("gh_events") + rows("repo_events");

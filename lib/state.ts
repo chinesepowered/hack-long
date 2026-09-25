@@ -162,7 +162,7 @@ async function build(): Promise<DashboardState> {
     safe("board: star velocity", "repo_events", sql.boardSql(16)),
     safe("ticker: latest stars", "repo_events", sql.tickerSql(30)),
     safe("feed: agent flight recorder", "agent_events", sql.feedSql(50)),
-    safe("bulletins", "bulletins", sql.bulletinsSql(12)),
+    safe("bulletins", "bulletins", sql.bulletinsSql(12, config.anchor.id)),
     safe("firehose: events per hour", "gh_events", sql.firehoseSql()),
     safe("production: story steps", "agent_events", sql.recentStoryEventsSql(20)),
   ]);

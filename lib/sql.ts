@@ -47,7 +47,8 @@ const bulletinRows = `
          ${str("captions_json")} AS _captions, ${num("stars_1h")} AS _s1h, ${num("stars_24h")} AS _s24h,
          ${num("stargazers")} AS _stargazers, ${str("category")} AS _category, ${str("one_liner")} AS _one,
          ${str("confidence")} AS _confidence, ${num("cost_credits")} AS _cost,
-         ${str("draft_cache_file")} AS _draft, ${num("is_final")} AS _final, ${str("trigger_kind")} AS _trigger
+         ${str("draft_cache_file")} AS _draft, ${num("is_final")} AS _final, ${str("trigger_kind")} AS _trigger,
+         ${str("__raw_data.anchor_id")} AS _anchor -- a field older rows never had: read it from the raw JSON, which returns '' instead of failing
   FROM bulletins`;
 
 /** Stage 1: candidates from the sampled firehose, ranked by stars, forks and distinct people. */
@@ -144,6 +145,10 @@ WHERE _repo IN (${inList(repos)})
 GROUP BY _repo`;
 }
 
+export function labeledReposSql() {
+  return `SELECT DISTINCT _repo AS repo FROM (SELECT ${str("repo")} AS _repo FROM labels)`;
+}
+
 /** The live star ticker: real people starring tracked repos. */
 export function tickerSql(limit = 40) {
   return `
@@ -186,14 +191,21 @@ ORDER BY ts DESC
 LIMIT 300`;
 }
 
-export function bulletinsSql(limit = 12) {
+/** FLUX credits recorded on bulletins over a rolling window, for the spend cap. */
+export function fluxSpendSql(hours = 24) {
+  return `SELECT sum(_cost) AS credits FROM (${bulletinRows}) WHERE _ts > now() - INTERVAL ${Math.floor(hours)} HOUR`;
+}
+
+/** Video bulletins are shown only for the current anchor, so the rundown stays one consistent face. */
+export function bulletinsSql(limit = 12, anchorId?: string) {
   return `
 SELECT _sid AS story_id, _repo AS repo, ${epoch("_ts")} AS ts, _headline AS headline, _dialogue AS dialogue,
        _video AS video_file, _poster AS poster_file, _captions AS captions_json, _s1h AS stars_1h,
        _s24h AS stars_24h, _stargazers AS stargazers, _category AS category, _one AS one_liner,
-       _confidence AS confidence, _cost AS cost_credits, _draft AS draft_cache_file, _final AS is_final
+       _confidence AS confidence, _cost AS cost_credits, _draft AS draft_cache_file, _final AS is_final,
+       _anchor AS anchor_id
 FROM (${bulletinRows})
-WHERE _ts IS NOT NULL
+WHERE _ts IS NOT NULL${anchorId ? ` AND (_video = '' OR _anchor = ${lit(anchorId)})` : ""}
 ORDER BY ts DESC
 LIMIT 1 BY story_id
 LIMIT ${Math.floor(limit)}`;

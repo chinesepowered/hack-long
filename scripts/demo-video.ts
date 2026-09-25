@@ -26,7 +26,8 @@ interface Segment {
   id: string;
   text?: string;
   focus?: string[];
-  action?: (page: Page) => Promise<void>;
+  /** May return the time (seconds into the recording) where audioFile should start, when it is only known live. */
+  action?: (page: Page) => Promise<number | void>;
   /** For segments with no narration: how long to hold, and an audio file to place at the segment start. */
   holdSeconds?: number;
   audioFile?: string;
@@ -66,7 +67,7 @@ async function focus(page: Page, labels: string[]) {
 }
 
 interface DemoState {
-  bulletins: { videoUrl: string; repo: string; headline: string }[];
+  bulletins: { videoUrl: string; repo: string; headline: string; isFinal: boolean }[];
   board: { repo: string }[];
 }
 
@@ -77,6 +78,9 @@ async function main() {
   const bulletin = state.bulletins.find((b) => b.videoUrl);
   const bulletinFile = bulletin ? path.join(DATA, bulletin.videoUrl.replace(/^\/api\/media\//, "")) : "";
 
+  let started = 0;
+  const clock = () => (performance.now() - started) / 1000;
+
   const segments: Segment[] = [
     {
       id: "intro",
@@ -85,7 +89,7 @@ async function main() {
     },
     {
       id: "firehose",
-      text: "Every hour, RawTree pulls the entire public GitHub firehose straight from GH Archive with server-side URL ingest. Millions of raw events, no schema. Every tile on this wall is a live query, and the median runs in milliseconds.",
+      text: "Every hour, RawTree pulls the public GitHub event firehose straight from GH Archive with server-side URL ingest. Millions of raw events, no schema. Every tile on this wall is a live query, and the median runs in milliseconds.",
       focus: ["Firehose", "Queries"],
     },
     {
@@ -95,7 +99,7 @@ async function main() {
     },
     {
       id: "pipeline",
-      text: "Every story runs the same beat. Memory from RawTree. Triage by a Liquid model on this laptop. Cited research from a Nimble web search agent. A script. Then FLUX 3 puts our anchor on camera, with lip-synced audio.",
+      text: "Every story runs the same beat. Memory from RawTree. Triage by a Liquid model on this laptop. Cited research from a Nimble web search agent. A script. Then FLUX 3 puts Scout, our beagle anchor, on camera with lip-synced audio. Every clip starts from the same pinned frame, so Scout looks the same in every story.",
       focus: ["Program", "Newsroom log"],
     },
   ];
@@ -107,7 +111,21 @@ async function main() {
       audioFile: bulletinFile,
       action: async (page) => {
         await page.getByRole("button", { name: "Replay" }).click();
+        // Place the bulletin's audio where playback really restarted, so the lip sync survives the mix.
+        // No named functions in here: tsx wraps them in a __name() helper that does not exist in the browser.
+        const playhead = await page.locator('[aria-label="Program"] video').evaluate(async (video: HTMLVideoElement) => {
+          while (video.paused || video.currentTime < 0.2) await new Promise((resolve) => setTimeout(resolve, 10));
+          return video.currentTime;
+        });
+        return clock() - playhead;
       },
+    });
+    segments.push({
+      id: "final",
+      text: bulletin.isFinal
+        ? "That was a final cut. Every video starts as a seventy-two cent draft, and when one is worth keeping, a producer clicks Render final cut and FLUX re-renders that same take in full 1080p."
+        : "That was a seventy-two cent draft. When one is worth keeping, a producer clicks Render final cut, and FLUX re-renders that same take in full 1080p.",
+      focus: ["Program"],
     });
   }
   segments.push({
@@ -137,7 +155,7 @@ async function main() {
   }
   segments.push({
     id: "outro",
-    text: "RawTree is its memory. Nimble, its eyes. FLUX, its voice. And Liquid, its reflexes. This is Breakout.",
+    text: "RawTree is its memory. Nimble, its eyes. FLUX, its face and voice. And Liquid, its reflexes. This is Breakout.",
     focus: [],
   });
 
@@ -156,28 +174,34 @@ async function main() {
     deviceScaleFactor: 1,
     recordVideo: { dir: OUT, size: { width: 1920, height: 1080 } },
   });
-  const started = performance.now();
+  started = performance.now();
   const page = await context.newPage();
   await page.goto(BASE, { waitUntil: "networkidle" });
   await page.addStyleTag({
     content: ".demo-focus{outline:3px solid #ffb547!important;outline-offset:-3px;transition:outline-color .3s}",
   });
-  await sleep(2500);
+  // The first frames are a blank page, then an empty wall until /api/state lands: start the cut once data is up.
+  await page
+    .waitForFunction(() => document.querySelectorAll('[aria-label="The board"] li').length > 0, null, { timeout: 30_000 })
+    .catch(() => console.warn("  board never filled; keeping the whole recording"));
+  await sleep(1000);
+  const head = clock();
+  await sleep(1000);
 
   const placements: { file: string; at: number }[] = [];
   for (const segment of segments) {
-    const at = (performance.now() - started) / 1000;
+    const at = clock();
     await focus(page, segment.focus ?? []);
     const voice = narration.get(segment.id);
     if (voice) placements.push({ file: voice.file, at });
-    if (segment.audioFile) placements.push({ file: segment.audioFile, at: at + 0.3 });
     const minimum = sleep(((voice?.seconds ?? 0) + (segment.holdSeconds ?? 0) + 0.6) * 1000);
-    await Promise.all([minimum, segment.action?.(page)]);
-    console.log(`  ${segment.id} at ${at.toFixed(1)}s`);
+    const [, audioAt] = await Promise.all([minimum, segment.action?.(page)]);
+    if (segment.audioFile) placements.push({ file: segment.audioFile, at: typeof audioAt === "number" ? audioAt : at + 0.3 });
+    console.log(`  ${segment.id} at ${(at - head).toFixed(1)}s`);
   }
   await focus(page, []);
   await sleep(2000);
-  const total = (performance.now() - started) / 1000;
+  const total = clock();
   const video = page.video();
   await context.close();
   await browser.close();
@@ -185,8 +209,9 @@ async function main() {
 
   console.log("Mixing and encoding...");
   const inputs = placements.flatMap((p) => ["-i", p.file]);
-  const delays = placements.map((p, i) => `[${i + 1}:a]adelay=${Math.round(p.at * 1000)}:all=1[a${i}]`).join(";");
+  const delays = placements.map((p, i) => `[${i + 1}:a]adelay=${Math.max(0, Math.round((p.at - head) * 1000))}:all=1[a${i}]`).join(";");
   const mix = `${placements.map((_, i) => `[a${i}]`).join("")}amix=inputs=${placements.length}:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[aout]`;
+  const trim = `[0:v]trim=start=${head.toFixed(3)},setpts=PTS-STARTPTS[vout]`;
   const output = path.join(OUT, `breakout-demo-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.mp4`);
   execFileSync(
     "ffmpeg",
@@ -194,10 +219,10 @@ async function main() {
       "-y",
       "-i", raw,
       ...inputs,
-      "-filter_complex", `${delays};${mix}`,
-      "-map", "0:v",
+      "-filter_complex", `${trim};${delays};${mix}`,
+      "-map", "[vout]",
       "-map", "[aout]",
-      "-t", total.toFixed(2),
+      "-t", (total - head).toFixed(2),
       "-c:v", "libx264",
       "-preset", "medium",
       "-crf", "20",
@@ -209,6 +234,7 @@ async function main() {
     ],
     { stdio: "inherit" },
   );
+  await fs.rm(raw, { force: true });
   console.log(`\nDemo video: ${output}`);
 }
 

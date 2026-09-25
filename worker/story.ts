@@ -78,6 +78,12 @@ function researchPrompt(repo: string, description: string, metrics: Metrics, sta
   return lines.join("\n");
 }
 
+/** FLUX credits spent over the last 24 hours, from what the desk recorded in RawTree. */
+async function fluxCreditsSpent(): Promise<number> {
+  const [row] = await query<Row>("budget: FLUX spend", sql.fluxSpendSql(24)).catch(() => [] as Row[]);
+  return Number(row?.credits) || 0;
+}
+
 export async function runStory(request: StoryRequest, tracker: Tracker): Promise<void> {
   const repo = request.repo;
   const storyId = request.storyId ?? storyIdFor(repo);
@@ -231,21 +237,36 @@ export async function runStory(request: StoryRequest, tracker: Tracker): Promise
     let videoFile = "";
     let draftCacheFile = "";
     let cost = 0;
-    if (enabled.bfl()) {
+    let anchorId = "";
+    const resumingVideo = prior.has("flux.submitted");
+    const spent = enabled.bfl() && !resumingVideo ? await fluxCreditsSpent() : 0;
+    if (enabled.bfl() && !resumingVideo && trigger === "auto" && !config.bfl.autoVideo) {
+      await log("flux.skipped", "flux", "Auto-detected story airs as text to save FLUX credits; assign it to get a video");
+    } else if (enabled.bfl() && !resumingVideo && spent >= config.bfl.dailyBudgetCredits) {
+      await log("flux.skipped", "flux", `Daily FLUX budget reached (${Math.round(spent)} of ${config.bfl.dailyBudgetCredits} credits); publishing as text`);
+    } else if (enabled.bfl()) {
       // A video failure (no credits, moderation, timeout) never kills the story: it airs as text.
       try {
-        let task = prior.get("flux.submitted") as (BflTask & { draft: boolean }) | undefined;
+        let task = prior.get("flux.submitted") as (BflTask & { draft: boolean; anchorId?: string }) | undefined;
         if (!task) {
+          const keyframe = await anchorKeyframe();
           const submitted = await submitVideo({
             prompt: videoPrompt(script.dialogue),
-            keyframe: await anchorKeyframe(),
+            keyframe,
             duration: config.bfl.duration,
             draft: config.bfl.draft,
             resolution: config.bfl.resolution,
           });
-          task = { ...submitted, draft: config.bfl.draft };
-          await log("flux.submitted", "flux", `FLUX 3 ${task.draft ? "draft" : "render"} submitted: ${config.bfl.duration}s, anchor pinned as frame one, audio on`, task);
+          task = { ...submitted, draft: config.bfl.draft, anchorId: keyframe ? config.anchor.id : "improvised" };
+          await log(
+            "flux.submitted",
+            "flux",
+            `FLUX 3 ${task.draft ? "draft" : "render"} submitted: ${config.bfl.duration}s, ${keyframe ? `${config.anchor.name} pinned as frame one` : "no anchor still, improvising"}, audio on`,
+            task,
+          );
         }
+        // Renders started before the anchor was pinned carry no anchorId; keep them out of the rundown.
+        anchorId = task.anchorId ?? "improvised";
         const result = await waitForResult(task, (status) => void log("flux.status", "flux", `FLUX 3: ${status}`, undefined, "progress"));
         if (result.status !== "Ready" || !result.result?.sample) throw new Error(`FLUX 3 ended as "${result.status}"`);
         videoFile = media.bulletinVideo(storyId);
@@ -274,6 +295,7 @@ export async function runStory(request: StoryRequest, tracker: Tracker): Promise
       repo,
       ts: new Date().toISOString(),
       trigger_kind: trigger,
+      anchor_id: videoFile ? anchorId : "",
       headline: script.headline,
       dialogue: script.dialogue,
       captions_json: JSON.stringify(script.captions),
@@ -306,6 +328,8 @@ export async function enhanceStory(storyId: string): Promise<void> {
     logEvent({ story_id: storyId, repo: String(row?.repo ?? ""), step, sponsor: "flux", message, data, status });
   try {
     if (!row?.draft_cache_file) throw new Error("no draft cache on record for this bulletin");
+    const spent = await fluxCreditsSpent();
+    if (spent >= config.bfl.dailyBudgetCredits) throw new Error(`daily FLUX budget reached (${Math.round(spent)} credits)`);
     const bundle = (await fs.readFile(mediaPath(String(row.draft_cache_file)))).toString("base64");
     const task = await submitEnhance(bundle, config.bfl.resolution === "hd" ? "fhd" : config.bfl.resolution);
     await log("enhance.submitted", "Rendering the chosen draft at full quality", task);

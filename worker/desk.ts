@@ -1,7 +1,9 @@
 import { config, isBreakout } from "@/lib/config";
 import { logEvent } from "@/lib/events";
-import { fetchRepos, isRepoName } from "@/lib/github";
-import { describeError, query } from "@/lib/rawtree";
+import { fetchReadme, fetchRepos, isRepoName } from "@/lib/github";
+import { labelRepo } from "@/lib/liquid";
+import { localAvailable } from "@/lib/llm";
+import { describeError, insert, query } from "@/lib/rawtree";
 import * as sql from "@/lib/sql";
 import { enhanceStory, repoMetrics, runStory, type StoryRequest } from "./story";
 import type { Tracker } from "./tracker";
@@ -23,6 +25,7 @@ export class Desk {
   private handled = new Set<string>();
   private budgetNoticeAt = 0;
   private lastBreakouts = new Set<string>();
+  private labeled: Set<string> | null = null;
 
   constructor(private tracker: Tracker) {}
 
@@ -89,6 +92,7 @@ export class Desk {
         createdAt: String(m.created_at ?? ""),
       };
     });
+    await this.labelBoard(repos);
     const breakouts = entries.filter((e) => e.stargazers > 0 && isBreakout(e));
     const newlyHot = breakouts.filter((b) => !this.lastBreakouts.has(b.repo));
     this.lastBreakouts = new Set(breakouts.map((b) => b.repo));
@@ -120,6 +124,49 @@ export class Desk {
       }
       this.enqueue({ repo: candidate.repo, trigger: "auto", metrics: candidate });
       return; // at most one new auto story per detection cycle
+    }
+  }
+
+  /**
+   * On-device triage for the whole board, not just stories: a few unlabeled repos per
+   * cycle go through Liquid LFM2.5 on this machine, so every row gets a category for $0.
+   */
+  private async labelBoard(repos: string[]) {
+    if (!(await localAvailable())) return;
+    if (!this.labeled) {
+      this.labeled = new Set<string>();
+      try {
+        const rows = await query<Row>("labels: already labeled", sql.labeledReposSql());
+        rows.forEach((row) => this.labeled!.add(String(row.repo)));
+      } catch {
+        // No labels table yet.
+      }
+    }
+    for (const repo of repos.filter((r) => !this.labeled!.has(r)).slice(0, 4)) {
+      this.labeled.add(repo);
+      const snapshot = this.tracker.latest.get(repo);
+      if (!snapshot) continue;
+      try {
+        const readme = await fetchReadme(repo).catch(() => "");
+        const label = await labelRepo({
+          repo,
+          description: snapshot.description,
+          topics: snapshot.topics,
+          language: snapshot.language,
+          readme: readme.slice(0, 800),
+        });
+        if (!label) continue;
+        await insert("labels", { repo, ...label, ts: new Date().toISOString(), source: "board" });
+        await logEvent({
+          repo,
+          step: "liquid.labeled",
+          sponsor: "liquid",
+          message: `On-device ${label.model}: ${label.category}, "${label.one_liner}" (${label.latency_ms} ms, $0)`,
+          data: label,
+        });
+      } catch (error) {
+        console.error(`liquid label ${repo}: ${describeError(error)}`);
+      }
     }
   }
 

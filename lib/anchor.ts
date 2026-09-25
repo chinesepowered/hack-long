@@ -2,14 +2,18 @@ import fs from "node:fs/promises";
 import { downloadTo, submitImage, waitForResult } from "./bfl";
 import { media, mediaPath } from "./media";
 
-/** A fictional anchor. Every bulletin opens on this exact frame, so she stays the same person. */
+/**
+ * Scout, the desk's beagle news hound. Every bulletin opens on this exact frame, so he
+ * stays the same anchor all day, and nobody mistakes AI-written news for a real journalist.
+ */
 export const ANCHOR_PROMPT = [
   "Cinematic still from a late-night technology news broadcast.",
-  "A confident news anchor in her early thirties with short dark hair, wearing a charcoal blazer over a black top,",
-  "sits at a sleek glass news desk and looks directly into the camera with a slight, warm smile, mouth closed.",
-  "Behind her, a wide curved LED wall shows an abstract glowing grid of small green squares, like a code contribution graph, over deep navy blue.",
-  "Moody studio lighting: soft key light on her face, cool blue rim light, a little atmospheric haze.",
-  "Medium shot at eye level, 35mm lens, shallow depth of field, photorealistic broadcast quality.",
+  "A beagle news anchor with floppy ears and a warm, alert expression sits upright at a sleek glass news desk,",
+  "wearing a tiny charcoal blazer over a white collared shirt, front paws resting on the desk,",
+  "looking directly into the camera, mouth closed.",
+  "Behind the anchor, a wide curved LED wall shows an abstract glowing grid of small green squares, like a code contribution graph, over deep navy blue.",
+  "Moody studio lighting: soft key light on the face, cool blue rim light, a little atmospheric haze.",
+  "Medium shot at eye level, 35mm lens, shallow depth of field, photorealistic and charming.",
   "No text, no logos, no captions, no watermark.",
 ].join(" ");
 

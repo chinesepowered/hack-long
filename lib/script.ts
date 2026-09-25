@@ -117,14 +117,15 @@ ${facts.readme.slice(0, 900) || "(none)"}
 Write the bulletin. Dialogue: ${minWords} to ${maxWords} words.`;
 }
 
-const SYSTEM = `You write spoken bulletins for BREAKOUT, a live broadcast about the fastest-rising open-source projects on GitHub. A news anchor reads your dialogue on camera.
+const SYSTEM = `You write spoken bulletins for BREAKOUT, a live broadcast about the fastest-rising open-source projects on GitHub. The anchor is Scout, a beagle and the desk's news hound, who reads your dialogue on camera.
 Rules:
 - Dialogue is spoken English: no markdown, no URLs, no emoji, no parentheses, no slashes. Spell numbers the way an anchor says them.
 - Open with the momentum (a concrete star number), then what the project is, then why it is taking off right now.
 - Use only facts from the research, claims and README. Never invent names, dates or numbers.
 - If the desk covered this project before, do not repeat yourself: open with what changed since then.
 - Headline: 3 to 7 words for the on-screen banner.
-- Captions: two or three short on-screen facts, each tied to the claim number that supports it.`;
+- Captions: two or three short on-screen facts, each tied to the claim number that supports it.
+- Scout may use one light dog pun (sniffing out, fetching, on the scent) when it fits naturally. Facts come first.`;
 
 async function generate(model: LanguageModel, facts: StoryFacts, functionId: string) {
   const { output } = await generateText({
@@ -209,11 +210,11 @@ export async function writeScript(facts: StoryFacts): Promise<Script> {
 export function videoPrompt(dialogue: string): string {
   const line = dialogue.replace(/"/g, "'");
   return [
-    "The news anchor from the opening frame sits at the glass desk of a dark, modern broadcast studio.",
-    `She looks straight into the camera and says, in a crisp, upbeat broadcast voice: "${line}"`,
-    "Her lips move precisely with each word, with natural blinks and small, confident head movements.",
-    "Slow, steady push-in toward the anchor. The glowing green grid on the wall behind her pulses gently.",
-    "Audio: only her voice, soft studio room tone, and a quiet, low news music bed underneath.",
+    "Scout, the beagle news anchor from the opening frame, sits at the glass desk of a dark, modern broadcast studio in his charcoal blazer.",
+    `He looks straight into the camera and says, in a warm, friendly, upbeat broadcast voice: "${line}"`,
+    "His mouth and jowls open and close precisely on each word, with natural blinks, small head tilts and ears that shift as he speaks.",
+    "Slow, steady push-in toward Scout. The glowing green grid on the wall behind him pulses gently.",
+    "Audio: only his voice, soft studio room tone, and a quiet, low news music bed underneath.",
     "These are the only words spoken. No on-screen text, no subtitles, no captions.",
   ].join(" ");
 }

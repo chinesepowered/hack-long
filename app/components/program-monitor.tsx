@@ -143,7 +143,7 @@ export function ProgramMonitor({
             muted={!soundOn}
           />
         ) : anchorAvailable ? (
-          <img src={ANCHOR_URL} alt="The Breakout anchor at the studio desk" className="h-full w-full object-cover" />
+          <img src={ANCHOR_URL} alt="Scout, the Breakout anchor, at the studio desk" className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(ellipse_at_center,#16294a,#07101f)]">
             <p className="cond text-6xl font-extrabold text-muted/70">Breakout</p>
