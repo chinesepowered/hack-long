@@ -4,7 +4,9 @@ Breakout is a live AI news desk for the fastest-rising open-source projects on G
 It watches the public GitHub event firehose, spots repos breaking out, researches why on the live web, and goes on air with a cited bulletin read by Scout, its beagle anchor.
 It runs all day, remembers everything it has reported, and resumes exactly where it left off after a crash.
 
-![Breakout control room](docs/control-room.jpg)
+**[Watch the 2-minute demo on YouTube](https://www.youtube.com/watch?v=vEWdqSe6c6w)**
+
+[![Breakout control room with Scout on air. Click to watch the demo.](docs/control-room.jpg)](https://www.youtube.com/watch?v=vEWdqSe6c6w)
 
 ## The problem
 
