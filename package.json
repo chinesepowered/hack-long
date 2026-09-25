@@ -1,0 +1,44 @@
+{
+  "name": "hack-long",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "worker": "tsx worker/index.ts",
+    "demo": "concurrently -n web,worker -c cyan,magenta \"next dev\" \"tsx worker/index.ts\"",
+    "anchor": "tsx scripts/make-anchor.ts",
+    "check": "tsx scripts/check.ts",
+    "demo:video": "tsx scripts/demo-video.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "^2.0.78",
+    "@nimble-way/ai-sdk": "^0.3.0",
+    "@nimble-way/nimble-js": "^1.5.0",
+    "@rawtree/otel": "^0.1.4",
+    "@rawtree/sdk": "^0.2.1",
+    "ai": "^6.0.291",
+    "next": "16.3.6",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^10.0.5",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.6",
+    "playwright-core": "^1.63.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.15",
+    "typescript": "^5"
+  },
+  "packageManager": "pnpm@11.22.0"
+}

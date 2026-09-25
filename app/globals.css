@@ -1,0 +1,323 @@
+@import "tailwindcss";
+
+/*
+ * Breakout: a broadcast multiviewer wall.
+ * Studio navy from the anchor's set, tally red only for "on air",
+ * GitHub's contribution greens only for star data, one hue per sponsor for source labels.
+ */
+:root {
+  --wall: #07101f;
+  --tile: #0f1d33;
+  --tile-raised: #16294a;
+  --line: #243a61;
+  --text: #eef3fa;
+  --muted: #a3b5cf;
+  --faint: #6f84a4;
+  --tally: #ff2d2d;
+  --chyron: #f3f6fa;
+  --chyron-ink: #0c1830;
+
+  --green-0: #1a2d4d;
+  --green-1: #0e4429;
+  --green-2: #006d32;
+  --green-3: #26a641;
+  --green-4: #39d353;
+
+  --rawtree: #2ee6b8;
+  --nimble: #c38cff;
+  --flux: #ffb547;
+  --liquid: #53c8ff;
+  --github: #d5deea;
+  --llm: #ff8fc7;
+  --desk: #ff7a6b;
+}
+
+@theme inline {
+  --color-wall: var(--wall);
+  --color-tile: var(--tile);
+  --color-tile-raised: var(--tile-raised);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-tally: var(--tally);
+  --color-star: var(--green-4);
+  --font-sans: var(--font-archivo), "Arial Narrow", Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, Consolas, monospace;
+}
+
+html,
+body {
+  background: var(--wall);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
+}
+
+/* Condensed widths of the same family carry the broadcast voice. */
+.cond {
+  font-stretch: 68%;
+}
+.semi {
+  font-stretch: 82%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--flux);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- tiles */
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--tile);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+/* The under-monitor display: which source feeds this tile. */
+.umd {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.1rem;
+  padding: 0 0.85rem;
+  background: #0a1628;
+  border-bottom: 1px solid var(--line);
+  font-stretch: 82%;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+  white-space: nowrap;
+}
+.umd .note {
+  font-weight: 400;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.umd .source {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+.tally-square {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 1px;
+  flex: none;
+}
+
+/* ---------------------------------------------------------------- program */
+
+.program {
+  outline: 3px solid var(--tally);
+  outline-offset: -3px;
+}
+.program.standby {
+  outline-color: var(--line);
+}
+
+.chyron {
+  position: absolute;
+  left: 3.5%;
+  right: 3.5%;
+  bottom: 6%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  filter: drop-shadow(0 10px 24px rgba(3, 8, 18, 0.55));
+}
+.chyron-tab {
+  grid-row: 1 / span 2;
+  display: flex;
+  align-items: center;
+  padding: 0 1.1rem;
+  background: var(--tally);
+  color: #fff;
+  font-stretch: 62%;
+  font-weight: 800;
+  font-size: clamp(1.1rem, 1.9vw, 2rem);
+  letter-spacing: 0.04em;
+}
+.chyron-headline {
+  background: var(--chyron);
+  color: var(--chyron-ink);
+  padding: 0.35rem 1rem 0.2rem;
+  font-stretch: 68%;
+  font-weight: 800;
+  font-size: clamp(1.4rem, 2.6vw, 2.9rem);
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chyron-source {
+  background: var(--chyron-ink);
+  color: var(--chyron);
+  padding: 0.3rem 1rem;
+  font-size: clamp(0.8rem, 1vw, 1.05rem);
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  min-height: 2rem;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.chyron-momentum {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 1rem;
+  background: var(--green-1);
+  color: #eafff0;
+  font-stretch: 68%;
+  text-align: right;
+}
+.chyron-momentum strong {
+  font-size: clamp(1.5rem, 2.6vw, 2.8rem);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--green-4);
+}
+
+.chyron-in {
+  animation: chyron-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes chyron-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(-12px);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+  }
+}
+
+.caption-swap {
+  animation: caption-swap 450ms ease-out both;
+}
+@keyframes caption-swap {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------------------------------------------------------------- tally light */
+
+.tally-light {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 3px;
+  font-stretch: 62%;
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: 0.06em;
+  background: #2a1216;
+  color: #ffb3b3;
+}
+.tally-light.live {
+  background: var(--tally);
+  color: #fff;
+  box-shadow: 0 0 22px rgba(255, 45, 45, 0.55);
+  animation: tally 2.4s ease-in-out infinite;
+}
+@keyframes tally {
+  50% {
+    box-shadow: 0 0 8px rgba(255, 45, 45, 0.25);
+  }
+}
+
+/* ---------------------------------------------------------------- contribution strip */
+
+.heat {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 2px;
+}
+.heat span {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: var(--green-0);
+}
+.heat span[data-level="1"] {
+  background: var(--green-1);
+}
+.heat span[data-level="2"] {
+  background: var(--green-2);
+}
+.heat span[data-level="3"] {
+  background: var(--green-3);
+}
+.heat span[data-level="4"] {
+  background: var(--green-4);
+}
+
+/* ---------------------------------------------------------------- crawl */
+
+.crawl {
+  display: flex;
+  width: max-content;
+  animation: crawl var(--crawl-duration, 60s) linear infinite;
+}
+@keyframes crawl {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.feed-enter {
+  animation: caption-swap 400ms ease-out both;
+}
+
+.scroll-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crawl,
+  .tally-light.live,
+  .chyron-in,
+  .caption-swap,
+  .feed-enter {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------- layout */
+
+/* The program monitor is sized from the viewport height so the whole wall fits a 16:9 projector. */
+.room-grid {
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1024px) {
+  .room-grid {
+    grid-template-columns: min(calc(max(100dvh - 456px, 360px) * 16 / 9), 68%) minmax(0, 1fr);
+    min-height: 0;
+    flex: 1;
+  }
+}
