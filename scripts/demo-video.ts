@@ -17,6 +17,7 @@ const BASE = process.env.DEMO_URL ?? "http://localhost:3000";
 const VOICE = process.env.ELEVENLABS_VOICE_ID ?? "onwK4e9ZLuTAKqWW03F9"; // "Daniel, Steady Broadcaster"
 const MODEL = process.env.ELEVENLABS_MODEL ?? "eleven_multilingual_v2";
 const QUESTION = process.env.DEMO_QUESTION ?? "Which repos gained the most stars in the last hour, and why is the top one taking off?";
+const STORY = process.env.DEMO_STORY ?? ""; // repo whose video bulletin to feature; defaults to the newest one
 const ASSIGN_REPO = process.env.DEMO_ASSIGN_REPO ?? ""; // set to film a live assignment (spends research + video credits)
 const DATA = path.resolve(process.env.DATA_DIR ?? "data");
 const OUT = path.join(DATA, "demo");
@@ -75,7 +76,8 @@ async function main() {
   if (!KEY) throw new Error("ELEVENLABS_API_KEY is not set");
   await fs.mkdir(OUT, { recursive: true });
   const state = (await (await fetch(`${BASE}/api/state`)).json()) as DemoState;
-  const bulletin = state.bulletins.find((b) => b.videoUrl);
+  const bulletin = state.bulletins.find((b) => b.videoUrl && (!STORY || b.repo === STORY));
+  if (STORY && !bulletin) throw new Error(`no video bulletin for ${STORY}`);
   const bulletinFile = bulletin ? path.join(DATA, bulletin.videoUrl.replace(/^\/api\/media\//, "")) : "";
 
   let started = 0;
@@ -114,9 +116,13 @@ async function main() {
         // Place the bulletin's audio where playback really restarted, so the lip sync survives the mix.
         // No named functions in here: tsx wraps them in a __name() helper that does not exist in the browser.
         const playhead = await page.locator('[aria-label="Program"] video').evaluate(async (video: HTMLVideoElement) => {
-          while (video.paused || video.currentTime < 0.2) await new Promise((resolve) => setTimeout(resolve, 10));
-          return video.currentTime;
+          const deadline = Date.now() + 8000;
+          while ((video.paused || video.currentTime < 0.2) && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
+          return video.paused ? -1 : video.currentTime;
         });
+        if (playhead < 0) throw new Error("the bulletin never started playing; check that /api/media serves it");
         return clock() - playhead;
       },
     });
@@ -167,7 +173,7 @@ async function main() {
     narration.set(segment.id, { file, seconds: probeSeconds(file) });
   }
 
-  console.log("Recording the control room...");
+  console.log(`Recording the control room${bulletin ? `, featuring ${bulletin.repo}` : ""}...`);
   const browser = await chromium.launch({ channel: "chrome", headless: true, args: ["--autoplay-policy=no-user-gesture-required"] });
   const context = await browser.newContext({
     viewport: { width: 1920, height: 1080 },
@@ -184,6 +190,8 @@ async function main() {
   await page
     .waitForFunction(() => document.querySelectorAll('[aria-label="The board"] li').length > 0, null, { timeout: 30_000 })
     .catch(() => console.warn("  board never filled; keeping the whole recording"));
+  // Pin the featured bulletin before the cut starts, so a newer story can't take over the program monitor mid-take.
+  if (bulletin) await page.locator('nav[aria-label="Rundown"] button', { hasText: bulletin.headline }).click();
   await sleep(1000);
   const head = clock();
   await sleep(1000);
